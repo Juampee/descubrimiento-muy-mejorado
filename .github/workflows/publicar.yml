@@ -1,0 +1,48 @@
+# Publica en la rama gh-pages (Settings → Pages → Deploy from a branch → gh-pages / root):
+#  - push a main  → demo en la raíz (index.html)
+#  - tag vX.Y.Z   → dist/remote.js en /vX.Y.Z/remote.js (las versiones anteriores no se borran)
+name: publicar
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: gh-pages
+  cancel-in-progress: false
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm test
+      - run: npm run build
+      - run: npm run build:demo
+      - name: Copiar a gh-pages
+        run: |
+          git fetch origin gh-pages || true
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            git worktree add /tmp/pages origin/gh-pages && cd /tmp/pages && git checkout -B gh-pages && cd -
+          else
+            git worktree add --orphan -b gh-pages /tmp/pages
+          fi
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            mkdir -p "/tmp/pages/${GITHUB_REF_NAME}"
+            cp dist/remote.js "/tmp/pages/${GITHUB_REF_NAME}/remote.js"
+          else
+            rm -rf /tmp/pages/assets /tmp/pages/index.html
+            cp -r dist-demo/. /tmp/pages/
+          fi
+          touch /tmp/pages/.nojekyll
+          cd /tmp/pages
+          git config user.name "release-bot"
+          git config user.email "release-bot@users.noreply.github.com"
+          git add -A
+          git commit -m "Publicar ${GITHUB_REF_NAME}" || exit 0
+          git push origin gh-pages
