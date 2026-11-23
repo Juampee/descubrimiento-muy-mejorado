@@ -12,6 +12,8 @@ con un globo en directo que se recorre haciendo scroll (inspirado en el *Live Gl
 - Rejilla con reordenación animada (FLIP), cambio de color por variante, añadir rápido con talla.
 - Ficha de producto con *morph* desde la tarjeta, color, talla, cantidad y «Combina con».
 - Animación del producto volando a la bolsa y aviso de confirmación.
+- Mini cesta (icono arriba a la derecha): lo añadido en esta visita agrupado por producto, total y botón «Ir al carrito y pagar» que lleva a la pieza Compra.
+- Se adapta al ancho del hueco que le dé la tienda (container queries), no al de la ventana.
 
 **Black Friday** (botón «Black Friday» arriba), en registro editorial: tinta, papel crema y granate, sin brillos ni neón.
 - Portada tipográfica en Playfair, cuenta atrás al 27/11 entre filetes finos.
@@ -34,11 +36,11 @@ Las ilustraciones de producto son SVG originales generados en código.
 | | |
 | --- | --- |
 | Custom element | `ucjc-descubrimiento` |
-| Export por defecto | `{ nombre: 'descubrimiento', version: '0.1.0' }` |
+| Export por defecto | `{ nombre: 'descubrimiento', version: '0.1.1' }` |
 | Emite | `ucjc:descubrimiento:anadir-al-carrito@1` con **solo** `productoId`, `nombre`, `precio`, `cantidad` |
 
 - Ids y precios `prod-101`…`prod-108` se mantienen; se añaden `prod-109`…`prod-114`.
-- Talla y color van dentro de `nombre` («Sudadera con capucha · Talla M · Gris jaspe»), no como campos nuevos.
+- El mismo producto viaja **siempre** con el mismo `productoId` y el mismo `nombre` de catálogo, para que Compra A y B lo traten igual (Compra B lo agrupa en una línea). Talla y color se eligen en la ficha pero no viajan: no están en el contrato.
 - En Black Friday, `precio` es el precio rebajado.
 - `ucjc:descubrimiento:campana-cambiada@1` está **propuesto**, así que solo se emite con el atributo `emitir-campana`.
 
@@ -48,7 +50,7 @@ Las ilustraciones de producto son SVG originales generados en código.
 <ucjc-descubrimiento></ucjc-descubrimiento>
 <!-- abrir directamente en Black Friday -->
 <ucjc-descubrimiento modo="black-friday"></ucjc-descubrimiento>
-<script type="module" src="https://<usuario>.github.io/descubrimiento-muy-mejorado/v0.1.0/remote.js"></script>
+<script type="module" src="https://<usuario>.github.io/descubrimiento-muy-mejorado/v0.1.1/remote.js"></script>
 ```
 
 ## Desarrollo

@@ -17,7 +17,7 @@ describe('contrato de carga', () => {
   beforeEach(() => { document.body.innerHTML = ''; });
   it('registra ucjc-descubrimiento y exporta { nombre, version }', () => {
     expect(customElements.get('ucjc-descubrimiento')).toBeTruthy();
-    expect(meta).toEqual({ nombre: 'descubrimiento', version: '0.1.0' });
+    expect(meta).toEqual({ nombre: 'descubrimiento', version: '0.1.1' });
   });
   it('no toca nada fuera de su elemento', () => {
     const antes = document.head.innerHTML;
@@ -56,16 +56,33 @@ describe('catálogo', () => {
 describe('anadir-al-carrito@1', () => {
   beforeEach(() => { document.body.innerHTML = ''; });
   it('el detail lleva SOLO los cuatro campos del contrato', () => {
-    const d = detalleCarrito(PRODUCTOS_POR_ID['prod-102'], { talla: 'M', color: 'gris', cantidad: 2 });
+    const d = detalleCarrito(PRODUCTOS_POR_ID['prod-102'], { cantidad: 2 });
     expect(Object.keys(d).sort()).toEqual(['cantidad', 'nombre', 'precio', 'productoId']);
-    expect(d).toEqual({ productoId: 'prod-102', nombre: 'Sudadera con capucha · Talla M · Gris jaspe', precio: 39.95, cantidad: 2 });
+    expect(d).toEqual({ productoId: 'prod-102', nombre: 'Sudadera con capucha', precio: 39.95, cantidad: 2 });
   });
   it('añadir rápido sin tallas emite el evento con el precio normal', () => {
     const ev = escuchar(EVT_CARRITO);
     const el = montar();
     el.shadowRoot.querySelector('[data-quick="prod-105"]').click();
-    expect(ev.at(-1)).toEqual({ productoId: 'prod-105', nombre: 'Mochila UCJC · Negro', precio: 29.9, cantidad: 1 });
+    expect(ev.at(-1)).toEqual({ productoId: 'prod-105', nombre: 'Mochila UCJC', precio: 29.9, cantidad: 1 });
     expect(el.shadowRoot.querySelector('[data-bolsa]').textContent).toBe('1');
+  });
+  it('el mismo producto viaja siempre con el mismo id y nombre, y el mini carrito lo agrupa', () => {
+    const ev = escuchar(EVT_CARRITO);
+    const el = montar();
+    const sr = el.shadowRoot;
+    sr.querySelector('.quick-btn[data-quick="prod-101"]').click();
+    sr.querySelector('[data-quick="prod-101"][data-talla="S"]').click();
+    sr.querySelector('[data-color="negro"][data-id="prod-101"]').click();
+    sr.querySelector('.quick-btn[data-quick="prod-101"]').click();
+    sr.querySelector('[data-quick="prod-101"][data-talla="XL"]').click();
+    const dos = ev.slice(-2);
+    expect(dos[0]).toEqual(dos[1]);
+    expect(dos[0]).toEqual({ productoId: 'prod-101', nombre: 'Camiseta Técnica UCJC', precio: 19.99, cantidad: 1 });
+    sr.querySelector('[data-mini]').click();
+    const filas = sr.querySelectorAll('.mini-lista li');
+    expect(filas.length).toBe(1);
+    expect(filas[0].textContent).toContain('2 × 19,99');
   });
   it('con tallas pide la talla antes de emitir', () => {
     const ev = escuchar(EVT_CARRITO);
@@ -74,7 +91,7 @@ describe('anadir-al-carrito@1', () => {
     el.shadowRoot.querySelector('.quick-btn[data-quick="prod-101"]').click();
     expect(ev.length).toBe(n);
     el.shadowRoot.querySelector('[data-quick="prod-101"][data-talla="L"]').click();
-    expect(ev.at(-1).nombre).toBe('Camiseta Técnica UCJC · Talla L · Granate');
+    expect(ev.at(-1).nombre).toBe('Camiseta Técnica UCJC');
   });
   it('la ficha exige talla y respeta la cantidad', () => {
     const ev = escuchar(EVT_CARRITO);
@@ -87,7 +104,7 @@ describe('anadir-al-carrito@1', () => {
     sr.querySelector('[data-det-talla="S"]').click();
     sr.querySelector('[data-det-cant="1"]').click();
     sr.querySelector('[data-det-anadir]').click();
-    expect(ev.at(-1)).toEqual({ productoId: 'prod-112', nombre: 'Jogger Villafranca · Talla S · Gris jaspe', precio: 34, cantidad: 2 });
+    expect(ev.at(-1)).toEqual({ productoId: 'prod-112', nombre: 'Jogger Villafranca', precio: 34, cantidad: 2 });
   });
 });
 

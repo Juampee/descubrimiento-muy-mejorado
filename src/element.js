@@ -14,14 +14,15 @@ const nombreCat = (id) => (CATEGORIAS.find((c) => c.id === id) || {}).nombre || 
 const estrellas = (v) => `<span class="estrellas" style="--v:${(v / 5) * 100}%" aria-label="${String(v).replace('.', ',')} de 5">★★★★★</span>`;
 const azar = (a) => a[Math.floor(Math.random() * a.length)];
 
-/** Construye el detail EXACTO del contrato @1: productoId, nombre, precio, cantidad. Nada más. */
-export function detalleCarrito(producto, { precio = producto.precio, cantidad = 1, talla = null, color = null } = {}) {
-  const extra = [];
-  if (talla) extra.push(`Talla ${talla}`);
-  if (color && producto.colores.length > 1 && COLORES[color]) extra.push(COLORES[color].nombre);
+/**
+ * Construye el detail EXACTO del contrato @1: productoId, nombre, precio, cantidad. Nada más.
+ * Para que Compra A y B agrupen bien, el mismo producto viaja SIEMPRE con el mismo id y el mismo
+ * nombre de catálogo (talla y color se eligen en la ficha pero no viajan: no están en el contrato).
+ */
+export function detalleCarrito(producto, { precio = producto.precio, cantidad = 1 } = {}) {
   return {
     productoId: producto.id,
-    nombre: extra.length ? `${producto.nombre} · ${extra.join(' · ')}` : producto.nombre,
+    nombre: producto.nombre,
     precio: redondear(precio),
     cantidad: Math.max(1, Math.floor(Number(cantidad) || 1)),
   };
@@ -57,6 +58,7 @@ export class UcjcDescubrimiento extends HTMLElement {
     this.modo = 'normal';
     this.tarjetas = new Map();
     this.detalle = null;
+    this.lineas = new Map(); // productoId -> { nombre, precio, cantidad } (lo enviado a Compra en esta visita)
     this.reducido = !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     this._timers = [];
   }
@@ -111,7 +113,8 @@ export class UcjcDescubrimiento extends HTMLElement {
           <button type="button" role="tab" data-modo="normal" aria-selected="true">Tienda</button>
           <button type="button" role="tab" data-modo="bf" aria-selected="false"><i class="led"></i>Black Friday</button>
         </div>
-        <div class="bolsa" data-bolsa-ico title="Añadidos desde Descubrimiento">${ICONO.bolsa}<span data-bolsa>0</span></div>
+        <button type="button" class="bolsa" data-bolsa-ico data-mini aria-expanded="false" aria-controls="mini" aria-label="Ver lo añadido a la cesta">${ICONO.bolsa}<span data-bolsa>0</span></button>
+        <div class="mini" id="mini" data-mini-panel hidden></div>
       </header>
 
       <div class="vista vista-normal">
@@ -161,12 +164,17 @@ export class UcjcDescubrimiento extends HTMLElement {
     </div>`;
 
     this.shadowRoot.addEventListener('click', (e) => this._clic(e));
+    this.shadowRoot.addEventListener('pointerdown', (e) => {
+      const panel = this.$('[data-mini-panel]');
+      if (!panel.hidden && !e.target.closest('[data-mini-panel], [data-mini]')) this._alternarMini(false);
+    });
     this.$('[data-buscar]').addEventListener('input', (e) => { this.estado.texto = e.target.value; this._pintarGrid(); });
     this.$('[data-orden]').addEventListener('change', (e) => { this.estado.orden = e.target.value; this._pintarGrid(); });
     this.$('[data-buscar]').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.target.value = ''; this.estado.texto = ''; this._pintarGrid(); } });
     this.shadowRoot.addEventListener('keydown', (e) => {
       if (e.key === '/' && !e.target.closest?.('input,select,textarea')) { e.preventDefault(); this.$('[data-buscar]').focus(); }
       if (e.key === 'Escape' && this.detalle) this.cerrarDetalle();
+      if (e.key === 'Escape' && !this.$('[data-mini-panel]').hidden) this._alternarMini(false);
     });
     this.$('.d').addEventListener('pointermove', (e) => {
       if (this.modo !== 'bf') return;
@@ -185,6 +193,9 @@ export class UcjcDescubrimiento extends HTMLElement {
     const t = e.target.closest('button, [data-abrir]');
     if (!t) return;
     const d = t.dataset;
+    if ('mini' in d) return this._alternarMini();
+    if ('miniCerrar' in d) return this._alternarMini(false);
+    if ('irCompra' in d) { this._alternarMini(false); return document.querySelector('ucjc-compra')?.scrollIntoView({ behavior: this.reducido ? 'auto' : 'smooth', block: 'start' }); }
     if (d.modo) return this.cambiarModo(d.modo);
     if (d.cat) { this.estado.categoria = d.cat; this.$$('[data-cat]').forEach((b) => b.setAttribute('aria-selected', String(b === t))); this._moverIndicadores(); return this._pintarGrid(); }
     if ('reset' in d) { this.estado = { categoria: 'todo', texto: '', orden: 'destacados' }; this.$('[data-buscar]').value = ''; this.$('[data-orden]').value = 'destacados'; this.$$('[data-cat]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.cat === 'todo'))); this._moverIndicadores(); return this._pintarGrid(); }
@@ -195,7 +206,7 @@ export class UcjcDescubrimiento extends HTMLElement {
       const p = PRODUCTOS_POR_ID[d.quick];
       if (p.tallas.length && !d.talla) return t.closest('.card').classList.toggle('elige-talla');
       t.closest('.card')?.classList.remove('elige-talla');
-      return this.anadir(p, { talla: d.talla || null, color: this.colores[p.id] }, t.closest('.card').querySelector('.arte'));
+      return this.anadir(p, {}, t.closest('.card').querySelector('.arte'));
     }
     if ('cerrar' in d) return this.cerrarDetalle();
     if (d.detColor) return this._detalleColor(d.detColor);
@@ -306,15 +317,43 @@ export class UcjcDescubrimiento extends HTMLElement {
 
   /* -------------------------------------------------------------- añadir */
 
-  anadir(producto, { precio = producto.precio, cantidad = 1, talla = null, color = null } = {}, origen = null) {
-    const detail = detalleCarrito(producto, { precio, cantidad, talla, color });
+  anadir(producto, { precio = producto.precio, cantidad = 1 } = {}, origen = null) {
+    const detail = detalleCarrito(producto, { precio, cantidad });
     this._emitirCarrito(detail);
     this.enBolsa += detail.cantidad;
+    const l = this.lineas.get(detail.productoId);
+    if (l) l.cantidad += detail.cantidad; else this.lineas.set(detail.productoId, { nombre: detail.nombre, precio: detail.precio, cantidad: detail.cantidad });
     const n = this.$('[data-bolsa]');
     n.textContent = this.enBolsa;
+    if (!this.$('[data-mini-panel]').hidden) this._pintarMini();
     this._volar(origen);
     this._toast(`<b>Añadido</b> ${esc(detail.nombre)}${detail.cantidad > 1 ? ` × ${detail.cantidad}` : ''} · ${euros(detail.precio)}`);
     return detail;
+  }
+
+  _alternarMini(abrir) {
+    const panel = this.$('[data-mini-panel]');
+    const boton = this.$('[data-mini]');
+    const ver = abrir ?? panel.hidden;
+    if (ver) this._pintarMini();
+    panel.hidden = !ver;
+    boton.setAttribute('aria-expanded', String(ver));
+    if (ver && !this.reducido) panel.animate?.([{ opacity: 0, transform: 'translateY(-8px)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  }
+
+  _pintarMini() {
+    const lineas = [...this.lineas.entries()];
+    const total = lineas.reduce((t, [, l]) => t + l.precio * l.cantidad, 0);
+    const hayCompra = !!document.querySelector('ucjc-compra');
+    this.$('[data-mini-panel]').innerHTML = `
+      <div class="mini-cab"><b>Tu cesta</b><button type="button" class="mini-x" data-mini-cerrar aria-label="Cerrar">${ICONO.cerrar}</button></div>
+      ${lineas.length ? `<ul class="mini-lista">${lineas.map(([id, l]) => {
+        const p = PRODUCTOS_POR_ID[id];
+        return `<li><span class="mini-arte">${p ? ilustracion(p) : ''}</span><span class="mini-txt"><b>${esc(l.nombre)}</b><small>${l.cantidad} × ${euros(l.precio)}</small></span><b>${euros(l.precio * l.cantidad)}</b></li>`;
+      }).join('')}</ul>
+      <p class="mini-total"><span>Total añadido</span><b>${euros(total)}</b></p>` : '<p class="mini-vacio">Aún no has añadido nada.</p>'}
+      ${hayCompra ? '<button type="button" class="btn primario mini-ir" data-ir-compra>Ir al carrito y pagar</button>' : ''}
+      <p class="mini-nota">El carrito, los cambios de cantidad y el pago están en Compra.</p>`;
   }
 
   _volar(origen) {
@@ -430,7 +469,7 @@ export class UcjcDescubrimiento extends HTMLElement {
       this.$('.tallas').animate?.([{ transform: 'translateX(0)' }, { transform: 'translateX(-8px)' }, { transform: 'translateX(8px)' }, { transform: 'translateX(0)' }], { duration: 300 });
       return;
     }
-    this.anadir(p, { cantidad: this.detalle.cantidad, talla: this.detalle.talla, color: this.detalle.color }, this.$('[data-det-arte]'));
+    this.anadir(p, { cantidad: this.detalle.cantidad }, this.$('[data-det-arte]'));
     boton.classList.add('hecho');
     boton.innerHTML = `${ICONO.ok}<span>Añadido</span>`;
     setTimeout(() => { if (boton.isConnected) { boton.classList.remove('hecho'); boton.innerHTML = '<span>Añadir otra vez</span>'; } }, 1600);
@@ -571,7 +610,7 @@ export class UcjcDescubrimiento extends HTMLElement {
     const p = PRODUCTOS_POR_ID[boton.dataset.bfAnadir];
     const desc = Number(boton.dataset.desc);
     const origen = boton.closest('.oferta, .premio')?.querySelector('.arte');
-    this.anadir(p, { precio: precioBF(p, desc), talla: boton.dataset.talla || null, color: p.colores[0] }, origen);
+    this.anadir(p, { precio: precioBF(p, desc) }, origen);
   }
 
   _latido() {

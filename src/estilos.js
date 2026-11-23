@@ -5,7 +5,7 @@
  * Si la página anfitriona no carga esas fuentes, se usan equivalentes del sistema.
  */
 export const CSS = `
-:host{display:block;
+:host{display:block;width:100%;max-width:100%;min-width:0;contain:inline-size;
   --g50:#f5e9ed;--g150:#e0bdc9;--g300:#c07b92;--g500:#96234a;--g600:#781c3b;--g700:#5a152c;
   --am:#ffe768;--n900:#1d1f21;--n800:#3f4042;--n700:#606263;--n400:#a4a5a6;--n200:#d2d2d3;--n100:#e8e9e9;--n50:#f5f5f5;
   --papel:#faf7f3;
@@ -17,7 +17,7 @@ export const CSS = `
 button{font:inherit;color:inherit;cursor:pointer}
 :focus-visible{outline:3px solid var(--am);outline-offset:2px;border-radius:6px}
 [hidden]{display:none!important}
-.d{position:relative;background:var(--papel);border-radius:28px;overflow:clip;isolation:isolate;transition:background .6s var(--ease)}
+.d{container-type:inline-size;container-name:pieza;position:relative;background:var(--papel);border-radius:28px;overflow:clip;isolation:isolate;transition:background .6s var(--ease)}
 .d[data-modo="bf"]{background:#07040a;color:#fff}
 
 /* ---------------------------------------------------------------- barra superior */
@@ -38,7 +38,24 @@ button{font:inherit;color:inherit;cursor:pointer}
 .d[data-modo="bf"] .pildora{background:var(--am);box-shadow:0 0 24px rgba(255,231,104,.55)}
 .led{width:8px;height:8px;border-radius:50%;background:#ff3358;box-shadow:0 0 0 0 rgba(255,51,88,.7);animation:led 1.6s infinite}
 @keyframes led{70%{box-shadow:0 0 0 8px rgba(255,51,88,0)}100%{box-shadow:0 0 0 0 rgba(255,51,88,0)}}
-.bolsa{justify-self:end;position:relative;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:#fff;border:1px solid var(--n100)}
+.bolsa{justify-self:end;position:relative;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:#fff;border:1px solid var(--n100);padding:0;transition:border-color .2s,transform .2s}
+.bolsa:hover,.bolsa[aria-expanded="true"]{border-color:var(--n900)}
+.mini{position:absolute;right:clamp(14px,3vw,32px);top:calc(100% + 8px);z-index:30;width:min(360px,calc(100% - 28px));background:var(--papel);color:var(--n900);border:1px solid var(--n200);border-radius:16px;padding:16px;box-shadow:0 24px 60px -20px rgba(0,0,0,.35);text-align:left}
+.mini-cab{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.mini-cab b{font-family:var(--serif);font-size:20px}
+.mini-x{border:0;background:none;padding:4px;display:grid;place-items:center}
+.mini-lista{list-style:none;margin:0;padding:0;max-height:280px;overflow:auto}
+.mini-lista li{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--n100);font-size:13px}
+.mini-arte{width:44px;height:44px;border-radius:10px;background:#efe8dd;display:grid;place-items:center}
+.mini-arte svg{width:36px;height:36px}
+.mini-txt{display:flex;flex-direction:column;min-width:0}
+.mini-txt b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-txt small{color:var(--n700)}
+.mini-total{display:flex;justify-content:space-between;margin:12px 0;font-size:14px}
+.mini-total b{font-family:var(--serif);font-size:18px}
+.mini-vacio{margin:8px 0 14px;color:var(--n700);font-size:14px}
+.mini-ir{width:100%}
+.mini-nota{margin:10px 0 0;font-size:11px;color:var(--n700);text-align:center}
 .d[data-modo="bf"] .bolsa{background:#1a1420;border-color:#2c2232;color:#fff}
 .bolsa span{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--g500);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}
 .d[data-modo="bf"] .bolsa span{background:var(--am);color:#000}
@@ -81,7 +98,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .estrellas::before{content:"★★★★★";position:absolute;inset:0;width:var(--v);overflow:hidden;color:#e0a100;white-space:nowrap}
 
 /* ---------------------------------------------------------------- cinta */
-.cinta{background:var(--n900);color:var(--am);overflow:hidden;padding:13px 0;transform:rotate(-1.2deg) scale(1.03);margin:8px 0 20px}
+.cinta{contain:inline-size;background:var(--n900);color:var(--am);overflow:hidden;padding:13px 0;transform:rotate(-1.2deg) scale(1.03);margin:8px 0 20px}
 .cinta-pista{display:flex;gap:28px;width:max-content;animation:cinta 32s linear infinite;font-weight:700;text-transform:uppercase;letter-spacing:.12em;font-size:12px;align-items:center}
 .cinta i{font-style:normal;color:var(--g150)}
 @keyframes cinta{to{transform:translateX(-50%)}}
@@ -93,7 +110,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .buscador:focus-within{border-color:var(--g500);box-shadow:0 0 0 5px rgba(150,35,74,.1)}
 .buscador input{flex:1;border:0;outline:0;background:none;font:inherit;font-size:14px;padding:13px 0;color:var(--n900);min-width:0}
 kbd{font:600 11px var(--sans);border:1px solid var(--n200);border-radius:6px;padding:3px 7px;color:var(--n700)}
-.cats{position:relative;display:flex;gap:2px;padding:4px;border-radius:999px;background:#fff;border:1.5px solid var(--n100);overflow-x:auto;scrollbar-width:none;max-width:100%}
+.cats{contain:inline-size;min-width:0;flex:1 1 400px;position:relative;display:flex;gap:2px;padding:4px;border-radius:999px;background:#fff;border:1.5px solid var(--n100);overflow-x:auto;scrollbar-width:none;max-width:100%}
 .cats button{position:relative;z-index:1;border:0;background:none;padding:9px 15px;border-radius:999px;font-size:13px;font-weight:600;color:var(--n700);white-space:nowrap;transition:color .3s}
 .cats sup{font-size:9px;margin-left:3px;opacity:.6}
 .cats button[aria-selected="true"]{color:#fff}
@@ -306,7 +323,7 @@ kbd{font:600 11px var(--sans);border:1px solid var(--n200);border-radius:6px;pad
 .volver{margin:0 auto;display:flex;border-radius:0;font-size:11px;letter-spacing:.2em;text-transform:uppercase}
 
 /* ---------------------------------------------------------------- responsive */
-@media (max-width:860px){
+@container pieza (max-width:860px){
   .hero{grid-template-columns:1fr}.hero-arte{max-width:360px;order:-1}
   .det-panel{grid-template-columns:1fr;border-radius:24px 24px 0 0;align-self:end;height:auto;max-height:94vh}
   .det-media{position:relative;height:auto;aspect-ratio:1.2}
@@ -317,7 +334,7 @@ kbd{font:600 11px var(--sans);border:1px solid var(--n200);border-radius:6px;pad
   .feed,.feed-et{display:none}
   .relampago+.relampago{border-left:0;border-top:1px solid var(--linea)}
 }
-@media (max-width:560px){
+@container pieza (max-width:560px){
   .top{grid-template-columns:auto 1fr auto}.marca-txt{display:none}.modos{justify-self:center}
   .modos button{padding:8px 11px;font-size:12px}
   .libro{left:16px;right:16px;top:16px;width:auto;display:flex;gap:14px}.libro div{flex:1;flex-direction:column;gap:2px;border-top:1px solid var(--linea)}.libro dt{font-size:8.5px}.libro dd{font-size:15px}
