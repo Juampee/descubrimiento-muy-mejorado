@@ -78,7 +78,24 @@ export class Globo {
     this.arcos.push({ a: aVector(...origen), b: aVector(...destino), t: 0, dest: destino, nombre });
   }
 
+  /**
+   * El canvas no entiende var(): leemos los tokens --ucjc-* ya resueltos sobre el propio canvas
+   * (llegan heredados desde el shell). Los literales son solo valores de reserva.
+   */
+  _leerTokens() {
+    const cs = getComputedStyle(this.canvas);
+    const t = (n, reserva) => cs.getPropertyValue(n).trim() || reserva;
+    this.col = {
+      tinta: t('--ucjc-ink', '#1a242c'),
+      panel: t('--ucjc-panel', '#fbfcfb'),
+      marca: t('--ucjc-brand', '#0b3d4a'),
+      clara: t('--ucjc-brand-bright', '#146b7a'),
+      fuente: t('--ucjc-font-display', 'Georgia, serif'),
+    };
+  }
+
   _medir() {
+    this._leerTokens();
     const r = this.canvas.getBoundingClientRect();
     const dpr = Math.min(2, globalThis.devicePixelRatio || 1);
     this.w = Math.max(1, r.width); this.h = Math.max(1, r.height);
@@ -133,45 +150,44 @@ export class Globo {
 
   _pintar(ahora, dt) {
     const { ctx, w, h } = this;
+    const C = this.col;
     this.cx = w / 2; this.cy = h / 2;
     this.R = Math.min(w, h) * 0.42 * this.zoom;
     const { cx, cy, R } = this;
-    const CREMA = '239,232,221';
+    const alfa = (v) => { ctx.globalAlpha = Math.max(0, Math.min(1, v)); };
     ctx.clearRect(0, 0, w, h);
 
-    // Esfera: tinta lisa con un filete crema, como una lámina de atlas.
-    ctx.fillStyle = '#14110f';
+    // Esfera: tinta del campus con un filete en color panel, como una lámina de atlas.
+    alfa(1); ctx.fillStyle = C.tinta;
     ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = `rgba(${CREMA},.35)`; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeStyle = `rgba(${CREMA},.12)`;
-    ctx.beginPath(); ctx.arc(cx, cy, R + 7, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = C.panel; ctx.lineWidth = 1;
+    alfa(0.35); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+    alfa(0.12); ctx.beginPath(); ctx.arc(cx, cy, R + 7, 0, Math.PI * 2); ctx.stroke();
 
     // Retícula fina
-    ctx.strokeStyle = `rgba(${CREMA},.07)`; ctx.lineWidth = 0.75;
+    alfa(0.07); ctx.lineWidth = 0.75;
     for (let lon = -180; lon < 180; lon += 20) this._linea(Array.from({ length: 37 }, (_, i) => [-90 + i * 5, lon]));
     for (let lat = -60; lat <= 60; lat += 20) this._linea(Array.from({ length: 73 }, (_, i) => [lat, -180 + i * 5]));
 
     // Tierra en punteado
     const r = Math.max(0.7, R / 300);
-    ctx.fillStyle = `rgb(${CREMA})`;
+    ctx.fillStyle = C.panel;
     for (let i = 0; i < TIERRA.length; i++) {
       const [la, lo] = TIERRA[i];
       const p = this._proy(la, lo);
       if (p.cosc <= 0.02) continue;
-      ctx.globalAlpha = 0.12 + p.cosc * 0.55;
+      alfa(0.12 + p.cosc * 0.55);
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.globalAlpha = 1;
 
-    const etiqueta = (txt, x, y, alfa) => {
+    const etiqueta = (txt, x, y, a) => {
       if (!this.etiquetas) return;
-      ctx.font = `italic ${Math.round(Math.max(11, R / 26))}px "Playfair Display", Georgia, serif`;
-      ctx.fillStyle = `rgba(${CREMA},${alfa})`;
+      ctx.font = `italic ${Math.round(Math.max(11, R / 26))}px ${C.fuente}`;
+      ctx.fillStyle = C.panel; alfa(a);
       ctx.fillText(txt, x + 8, y - 6);
     };
 
-    // Arcos: trazo fino granate → crema
+    // Arcos: trazo fino en marca clara que termina en color panel
     const vel = this.reducido ? 1 : dt / 2200;
     this.arcos = this.arcos.filter((a) => a.t < 1.8);
     for (const a of this.arcos) {
@@ -186,8 +202,9 @@ export class Globo {
         const p = this._proy(la, lo, 1 + Math.sin(Math.PI * t) * altura);
         if (prev && p.delante && prev.delante) {
           const f = i / N;
-          ctx.strokeStyle = f > 0.85 ? `rgba(${CREMA},${0.9 * f})` : `rgba(192,123,146,${0.15 + f * 0.6})`;
-          ctx.lineWidth = 0.6 + f * 0.8;
+          ctx.strokeStyle = f > 0.85 ? C.panel : C.clara;
+          alfa(f > 0.85 ? 0.9 * f : 0.25 + f * 0.6);
+          ctx.lineWidth = 0.6 + f * 0.9;
           ctx.beginPath(); ctx.moveTo(prev.x, prev.y); ctx.lineTo(p.x, p.y); ctx.stroke();
         }
         prev = p;
@@ -201,20 +218,21 @@ export class Globo {
       g.t += this.reducido ? 1 : dt / 2600;
       const p = this._proy(...g.dest);
       if (p.cosc <= 0.05) continue;
-      const alfa = g.t < 0.15 ? g.t / 0.15 : 1 - (g.t - 0.15) / 0.85;
-      ctx.strokeStyle = `rgba(${CREMA},${alfa * 0.6})`; ctx.lineWidth = 0.75;
+      const a = g.t < 0.15 ? g.t / 0.15 : 1 - (g.t - 0.15) / 0.85;
+      ctx.strokeStyle = C.panel; ctx.lineWidth = 0.75; alfa(a * 0.6);
       ctx.beginPath(); ctx.arc(p.x, p.y, 3 + g.t * 6, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = `rgba(${CREMA},${alfa})`; ctx.beginPath(); ctx.arc(p.x, p.y, 1.6, 0, Math.PI * 2); ctx.fill();
-      if (g.nombre) etiqueta(g.nombre, p.x, p.y, alfa * 0.9);
+      ctx.fillStyle = C.panel; alfa(a); ctx.beginPath(); ctx.arc(p.x, p.y, 1.6, 0, Math.PI * 2); ctx.fill();
+      if (g.nombre) etiqueta(g.nombre, p.x, p.y, a * 0.9);
     }
 
     // Campus
     const m = this._proy(...MADRID);
     if (m.cosc > 0) {
-      ctx.fillStyle = '#96234a'; ctx.beginPath(); ctx.arc(m.x, m.y, 3.5, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = `rgba(${CREMA},.8)`; ctx.lineWidth = 0.75; ctx.beginPath(); ctx.arc(m.x, m.y, 7, 0, Math.PI * 2); ctx.stroke();
+      alfa(1); ctx.fillStyle = C.clara; ctx.beginPath(); ctx.arc(m.x, m.y, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = C.panel; ctx.lineWidth = 0.75; alfa(0.8); ctx.beginPath(); ctx.arc(m.x, m.y, 7, 0, Math.PI * 2); ctx.stroke();
       etiqueta('Villafranca', m.x + 4, m.y, 0.9);
     }
+    alfa(1);
   }
 
   _linea(puntos) {

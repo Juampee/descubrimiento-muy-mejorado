@@ -4,4 +4,4 @@ if (!customElements.get('ucjc-descubrimiento')) {
   customElements.define('ucjc-descubrimiento', UcjcDescubrimiento);
 }
 
-export default { nombre: 'descubrimiento', version: '0.1.1' };
+export default { nombre: 'descubrimiento', version: '0.2.0' };

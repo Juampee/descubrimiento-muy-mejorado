@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import meta from '../src/main.js';
-import { detalleCarrito, EVT_CARRITO, EVT_CAMPANA } from '../src/element.js';
+import { detalleCarrito, detalleCampana, EVT_CARRITO, EVT_CAMPANA } from '../src/element.js';
+import { CSS } from '../src/estilos.js';
+import { readFileSync } from 'node:fs';
 import { PRODUCTOS, PRODUCTOS_POR_ID, precioBF, filtrar, BLACK_FRIDAY } from '../src/catalogo.js';
 import { TIPOS } from '../src/arte.js';
 import { TIERRA } from '../src/tierra.js';
@@ -17,7 +19,7 @@ describe('contrato de carga', () => {
   beforeEach(() => { document.body.innerHTML = ''; });
   it('registra ucjc-descubrimiento y exporta { nombre, version }', () => {
     expect(customElements.get('ucjc-descubrimiento')).toBeTruthy();
-    expect(meta).toEqual({ nombre: 'descubrimiento', version: '0.1.1' });
+    expect(meta).toEqual({ nombre: 'descubrimiento', version: '0.2.0' });
   });
   it('no toca nada fuera de su elemento', () => {
     const antes = document.head.innerHTML;
@@ -73,7 +75,7 @@ describe('anadir-al-carrito@1', () => {
     const sr = el.shadowRoot;
     sr.querySelector('.quick-btn[data-quick="prod-101"]').click();
     sr.querySelector('[data-quick="prod-101"][data-talla="S"]').click();
-    sr.querySelector('[data-color="negro"][data-id="prod-101"]').click();
+    sr.querySelector('[data-color="tinta"][data-id="prod-101"]').click();
     sr.querySelector('.quick-btn[data-quick="prod-101"]').click();
     sr.querySelector('[data-quick="prod-101"][data-talla="XL"]').click();
     const dos = ev.slice(-2);
@@ -122,14 +124,50 @@ describe('Black Friday', () => {
     sr.querySelector('[data-quick="prod-105"]').click();
     expect(ev.at(-1).precio).toBe(29.9);
   });
-  it('campana-cambiada@1 solo se emite con el atributo emitir-campana', () => {
+  it('campana-cambiada@1 se emite al cargar, al encender y al apagar, con su detail exacto', () => {
     const ev = escuchar(EVT_CAMPANA);
+    const n = ev.length;
     const el = montar();
+    expect(ev.length).toBe(n + 1);
+    expect(ev.at(-1).activa).toBe(false);
     el.cambiarModo('bf', { sinCortina: true });
-    expect(ev.length).toBe(0);
-    const el2 = montar({ 'emitir-campana': '' });
-    el2.cambiarModo('bf', { sinCortina: true });
-    expect(Object.keys(ev.at(-1)).sort()).toEqual(['activa', 'codigo', 'etiqueta', 'momento']);
     expect(ev.at(-1).activa).toBe(true);
+    el.cambiarModo('normal', { sinCortina: true });
+    expect(ev.at(-1).activa).toBe(false);
+    expect(ev.length).toBe(n + 3);
+    const d = ev.at(-1);
+    expect(Object.keys(d).sort()).toEqual(['activa', 'codigo', 'etiqueta', 'momento']);
+    expect(d.codigo).toBe('black-friday-2026');
+    expect(d.etiqueta).toBe('Black Friday UCJC');
+    expect(Number.isNaN(Date.parse(d.momento))).toBe(false);
+    expect(detalleCampana(true).activa).toBe(true);
+  });
+});
+
+describe('presentacion-campus@1', () => {
+  const fuentes = ['src/estilos.js', 'src/arte.js', 'src/catalogo.js', 'src/globo.js', 'src/element.js']
+    .map((f) => [f, readFileSync(f, 'utf8')]);
+  it('ningún !important', () => {
+    fuentes.forEach(([, txt]) => expect(txt.includes('!' + 'important')).toBe(false));
+    expect(CSS.includes('!' + 'important')).toBe(false);
+  });
+  it('cada color escrito a mano es solo un valor de reserva de un token --ucjc-*', () => {
+    const hex = /#[0-9a-fA-F]{3,8}\b/g;
+    fuentes.forEach(([f, txt]) => {
+      txt.split('\n').forEach((linea) => {
+        (linea.match(hex) || []).forEach(() => expect(`${f}: ${linea.trim()}`).toMatch(/--ucjc-[a-z-]+['"]?,\s*['"]?#/));
+      });
+      expect(txt).not.toMatch(/rgba?\(/);
+    });
+  });
+  it('sin tipografía propia: solo los tokens de fuente', () => {
+    expect(CSS).not.toMatch(/@font-face/);
+    (CSS.match(/font-family:[^;}]+/g) || []).forEach((d) => expect(d).toMatch(/var\(--ucjc-font-(sans|display)/));
+  });
+});
+
+describe('ocultos sin forzar', () => {
+  it('[hidden] gana a las reglas de display de la pieza', () => {
+    expect(CSS).toMatch(/\.d \[hidden\],\.d\[hidden\]\{display:none\}/);
   });
 });

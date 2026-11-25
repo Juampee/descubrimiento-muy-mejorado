@@ -24,25 +24,33 @@ con un globo en directo que se recorre haciendo scroll (inspirado en el *Live Gl
 
 El modo Black Friday **no toca la tienda normal**: precios, filtros y estado van por separado, y al salir se desmonta.
 
-## Identidad visual
+## Identidad visual: contrato `presentacion-campus@1` (desde v0.2.0)
 
-Tomada de ucjc.edu: granate `#96234a` (escala `#f5e9ed` → `#5a152c`), amarillo `#ffe768`, neutros `#1d1f21`…`#f5f5f5`,
-**Encode Sans Semi Expanded** para texto y **Playfair Display** para titulares. La pieza no carga fuentes
-(no toca `<head>`); si la página anfitriona las carga se usan, si no, equivalentes del sistema.
-Las ilustraciones de producto son SVG originales generados en código.
+La pieza usa **solo** los tokens comunes del shell (`comun/campus.css`), así la tienda entera comparte color, letra y radios:
+
+- **Color:** `--ucjc-ink`, `--ucjc-muted`, `--ucjc-fog`, `--ucjc-mist`, `--ucjc-panel`, `--ucjc-edge`, `--ucjc-brand`, `--ucjc-brand-bright`, `--ucjc-leaf`, `--ucjc-warn`. Los tonos intermedios se mezclan desde esos tokens con `color-mix()`.
+- **Tipografía:** `--ucjc-font-sans` (Figtree) y `--ucjc-font-display` (Fraunces). Ninguna fuente propia.
+- **Radios y espacios:** `--ucjc-radius`, `--ucjc-space`, `--ucjc-space-lg` (y múltiplos con `calc()`); animaciones con `--ucjc-ease`.
+- Cada `var()` lleva **valor de reserva** (el mismo del shell): fuera de la tienda la pieza se ve igual.
+- **Cero** declaraciones forzadas; los colores de las prendas y del globo también salen de los tokens.
+- Un test (`presentacion-campus@1`) falla si aparece un color escrito a mano fuera de un valor de reserva, una fuente propia o una declaración forzada.
+
+Antes (v0.1.0): 101 colores a mano, 7 declaraciones forzadas y tipografía propia. Ahora: 0, 0 y 0.
 
 ## Contrato
 
 | | |
 | --- | --- |
 | Custom element | `ucjc-descubrimiento` |
-| Export por defecto | `{ nombre: 'descubrimiento', version: '0.1.1' }` |
+| Export por defecto | `{ nombre: 'descubrimiento', version: '0.2.0' }` |
 | Emite | `ucjc:descubrimiento:anadir-al-carrito@1` con **solo** `productoId`, `nombre`, `precio`, `cantidad` |
+| Emite | `ucjc:descubrimiento:campana-cambiada@1` con **solo** `activa`, `codigo`, `etiqueta`, `momento` |
 
 - Ids y precios `prod-101`…`prod-108` se mantienen; se añaden `prod-109`…`prod-114`.
 - El mismo producto viaja **siempre** con el mismo `productoId` y el mismo `nombre` de catálogo, para que Compra A y B lo traten igual (Compra B lo agrupa en una línea). Talla y color se eligen en la ficha pero no viajan: no están en el contrato.
 - En Black Friday, `precio` es el precio rebajado.
-- `ucjc:descubrimiento:campana-cambiada@1` está **propuesto**, así que solo se emite con el atributo `emitir-campana`.
+- Emite `ucjc:descubrimiento:campana-cambiada@1` (**firmado**) con `activa`, `codigo`, `etiqueta`, `momento`: al cargar la pieza, al encender y al apagar el Black Friday.
+- Emite con `ucjcCampus.emitir` si el shell lo ofrece (comprueba `ucjcCampus.version === '1'`); si no, con `window.dispatchEvent`. No pone listeners en `window`.
 
 ## Uso
 
@@ -50,7 +58,7 @@ Las ilustraciones de producto son SVG originales generados en código.
 <ucjc-descubrimiento></ucjc-descubrimiento>
 <!-- abrir directamente en Black Friday -->
 <ucjc-descubrimiento modo="black-friday"></ucjc-descubrimiento>
-<script type="module" src="https://<usuario>.github.io/descubrimiento-muy-mejorado/v0.1.1/remote.js"></script>
+<script type="module" src="https://<usuario>.github.io/descubrimiento-muy-mejorado/v0.2.0/remote.js"></script>
 ```
 
 ## Desarrollo

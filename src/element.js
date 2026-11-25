@@ -9,6 +9,18 @@ import { Globo, CIUDADES, MADRID } from './globo.js';
 export const EVT_CARRITO = 'ucjc:descubrimiento:anadir-al-carrito@1';
 export const EVT_CAMPANA = 'ucjc:descubrimiento:campana-cambiada@1';
 
+/** presentacion-campus@1: se emite con ucjcCampus.emitir si el shell lo ofrece; si no, con window.dispatchEvent. */
+function emitir(nombre, detail) {
+  if (window.ucjcCampus?.version === '1') return window.ucjcCampus.emitir(nombre, detail);
+  window.dispatchEvent(new CustomEvent(nombre, { detail }));
+  return null;
+}
+
+/** detail EXACTO de campana-cambiada@1 (firmado): activa, codigo, etiqueta, momento. */
+export function detalleCampana(activa) {
+  return { activa: !!activa, codigo: BLACK_FRIDAY.codigo, etiqueta: BLACK_FRIDAY.etiqueta, momento: new Date().toISOString() };
+}
+
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const nombreCat = (id) => (CATEGORIAS.find((c) => c.id === id) || {}).nombre || id;
 const estrellas = (v) => `<span class="estrellas" style="--v:${(v / 5) * 100}%" aria-label="${String(v).replace('.', ',')} de 5">★★★★★</span>`;
@@ -64,12 +76,13 @@ export class UcjcDescubrimiento extends HTMLElement {
   }
 
   connectedCallback() {
+    if (window.ucjcCampus?.version !== '1') console.warn('[descubrimiento] sin campus: se usan los valores de reserva');
     if (!this.shadowRoot) {
       this.attachShadow({ mode: 'open' });
       this._montar();
     }
     if (this.getAttribute('modo') === 'black-friday') this.cambiarModo('bf', { sinCortina: true });
-    if (this.hasAttribute('emitir-campana')) this._emitirCampana();
+    else this._emitirCampana(); // al cargar se avisa del estado actual (contrato campana-cambiada@1)
     this._heroGiro = setInterval(() => this._rotarHero(), 3800);
   }
 
@@ -89,15 +102,12 @@ export class UcjcDescubrimiento extends HTMLElement {
   /* ------------------------------------------------------------------ eventos */
 
   _emitirCarrito(detail) {
-    window.dispatchEvent(new CustomEvent(EVT_CARRITO, { detail }));
+    emitir(EVT_CARRITO, detail);
   }
 
-  /** Solo con el atributo `emitir-campana` (el contrato campana-cambiada@1 aún está «propuesto»). */
+  /** campana-cambiada@1 (firmado): al cargar, al encender y al apagar el Black Friday. */
   _emitirCampana() {
-    if (!this.hasAttribute('emitir-campana')) return;
-    window.dispatchEvent(new CustomEvent(EVT_CAMPANA, {
-      detail: { activa: this.modo === 'bf', codigo: BLACK_FRIDAY.codigo, etiqueta: BLACK_FRIDAY.etiqueta, momento: new Date().toISOString() },
-    }));
+    emitir(EVT_CAMPANA, detalleCampana(this.modo === 'bf'));
   }
 
   /* ------------------------------------------------------------------ montaje */
@@ -480,6 +490,7 @@ export class UcjcDescubrimiento extends HTMLElement {
   cambiarModo(modo, { sinCortina = false } = {}) {
     if (modo === this.modo) return;
     this.modo = modo;
+    if (!this.shadowRoot) return;
     this.$$('.modos [data-modo]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.modo === modo)));
     this._moverIndicadores();
     if (this.detalle) this.cerrarDetalle(true);
